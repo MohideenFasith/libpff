@@ -1,14 +1,10 @@
 #!/bin/bash -eu
-# ClusterFuzzLite build script for libpff (Outlook PST/PFF parser)
-# Targets: file, item, record_set, message, folder, attachment,
-#          name_to_id_map, recover fuzzers
+# ClusterFuzzLite build script for libpff
+# All sub-libraries are vendored — no network access required.
 
 cd "$SRC/libpff"
 
-# ── 1. Sync vendored libyal sub-libraries ─────────────────────────────────────
-bash synclibs.sh
-
-# ── 2. Configure + build ──────────────────────────────────────────────────────
+# ── 1. Configure + build (sub-libs already present, skip synclibs.sh) ────────
 ./autogen.sh
 ./configure \
     --enable-shared=no \
@@ -18,10 +14,10 @@ bash synclibs.sh
 
 make -j"$(nproc)"
 
-# ── 3. Collect all static archives ───────────────────────────────────────────
+# ── 2. Collect all static archives ───────────────────────────────────────────
 ALL_LIBS=$(find . -name "*.a" -path "*/.libs/*" | tr '\n' ' ')
 
-# ── 4. Build include path (local libyal sub-libraries) ───────────────────────
+# ── 3. Build include path ─────────────────────────────────────────────────────
 EXTRA_INCS=""
 for d in libbfio libcerror libcdata libclocale libcnotify libcpath libcsplit \
           libcthreads libuna libfcache libfdata libfdatetime libfguid \
@@ -32,7 +28,7 @@ done
 INCLUDES="-I. -I./include -I./common -I./ossfuzz $EXTRA_INCS"
 DEFINES="-DHAVE_LOCAL_LIBBFIO -DHAVE_CONFIG_H"
 
-# ── 5. Compile each fuzzer ────────────────────────────────────────────────────
+# ── 4. Compile each fuzzer ────────────────────────────────────────────────────
 for src in \
     ossfuzz/file_fuzzer.cc \
     ossfuzz/item_fuzzer.cc \
