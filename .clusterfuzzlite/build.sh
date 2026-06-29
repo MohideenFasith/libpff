@@ -1,10 +1,13 @@
 #!/bin/bash -eu
 # ClusterFuzzLite build script for libpff
-# All sub-libraries are vendored — no network access required.
+# All libyal sub-libraries are vendored — no network access required.
+#
+# $SRC is /src in OSS-Fuzz; repo is cloned to /src/repo by ClusterFuzzLite.
 
-cd "$SRC/libpff"
+REPO="${SRC}/repo"
+cd "$REPO"
 
-# ── 1. Configure + build (sub-libs already present, skip synclibs.sh) ────────
+# autogen + configure
 ./autogen.sh
 ./configure \
     --enable-shared=no \
@@ -14,21 +17,20 @@ cd "$SRC/libpff"
 
 make -j"$(nproc)"
 
-# ── 2. Collect all static archives ───────────────────────────────────────────
-ALL_LIBS=$(find . -name "*.a" -path "*/.libs/*" | tr '\n' ' ')
+# Collect all static archives built under the repo
+ALL_LIBS=$(find "$REPO" -name "*.a" -path "*/.libs/*" | tr '\n' ' ')
 
-# ── 3. Build include path ─────────────────────────────────────────────────────
-EXTRA_INCS=""
+# Include paths for vendored sub-libraries
+EXTRA=""
 for d in libbfio libcerror libcdata libclocale libcnotify libcpath libcsplit \
           libcthreads libuna libfcache libfdata libfdatetime libfguid \
           libfmapi libfvalue libfwnt; do
-    [ -d "$d" ] && EXTRA_INCS="$EXTRA_INCS -I./$d"
+    [ -d "$REPO/$d" ] && EXTRA="$EXTRA -I$REPO/$d"
 done
 
-INCLUDES="-I. -I./include -I./common -I./ossfuzz $EXTRA_INCS"
-DEFINES="-DHAVE_LOCAL_LIBBFIO -DHAVE_CONFIG_H"
+INC="-I$REPO -I$REPO/include -I$REPO/common -I$REPO/ossfuzz $EXTRA"
+DEF="-DHAVE_LOCAL_LIBBFIO -DHAVE_CONFIG_H"
 
-# ── 4. Compile each fuzzer ────────────────────────────────────────────────────
 for src in \
     ossfuzz/file_fuzzer.cc \
     ossfuzz/item_fuzzer.cc \
@@ -40,12 +42,12 @@ for src in \
     fuzz/recover_fuzzer.cc; do
 
     name=$(basename "$src" .cc)
-    echo "[+] Building $name ..."
-    $CXX $CXXFLAGS $DEFINES $INCLUDES \
-        "$src" \
+    echo "[+] $name"
+    $CXX $CXXFLAGS $DEF $INC \
+        "$REPO/$src" \
         $ALL_LIBS -lz \
         $LIB_FUZZING_ENGINE \
         -o "$OUT/$name"
 done
 
-echo "[+] All fuzzers built in $OUT/"
+echo "[+] Done — fuzzers in $OUT/"
