@@ -4,8 +4,16 @@
 
 cd "$SRC"
 
-./autogen.sh
-./configure \
+# The submission gets packaged as a zip, which commonly strips Unix
+# executable permissions even when git records mode 100755. Defensively
+# chmod +x the generated autotools scripts before use, and invoke via
+# explicit shell rather than direct execution.
+chmod +x autogen.sh configure ltmain.sh install-sh missing \
+         compile depcomp config.guess config.sub synclibs.sh 2>/dev/null || true
+touch aclocal.m4 configure Makefile.in 2>/dev/null || true
+
+sh ./autogen.sh
+sh ./configure \
     --enable-shared=no \
     --disable-python \
     CFLAGS="$CFLAGS" \
